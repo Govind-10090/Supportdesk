@@ -9,12 +9,18 @@ import APIDebugger from './pages/APIDebugger';
 import LogAnalyzer from './pages/LogAnalyzer';
 import AdminDashboard from './pages/AdminDashboard';
 import KnowledgeBase from './pages/KnowledgeBase';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const PrivateRoute = ({ children, roles }: { children: React.ReactNode, roles?: string[] }) => {
-  const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const { user, loading } = useAuth();
 
-  if (!token) return <Navigate to="/login" />;
+  if (loading) return (
+    <div className="min-h-screen bg-[#E4E3E0] flex items-center justify-center font-mono">
+      <div className="text-[#141414] animate-pulse uppercase tracking-widest">Initializing Secure Session...</div>
+    </div>
+  );
+
+  if (!user) return <Navigate to="/login" />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/" />;
 
   return <Layout>{children}</Layout>;
@@ -22,60 +28,62 @@ const PrivateRoute = ({ children, roles }: { children: React.ReactNode, roles?: 
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        
-        <Route path="/" element={
-          <PrivateRoute>
-            <Dashboard />
-          </PrivateRoute>
-        } />
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          
+          <Route path="/" element={
+            <PrivateRoute>
+              <Dashboard />
+            </PrivateRoute>
+          } />
 
-        <Route path="/tickets" element={
-          <PrivateRoute>
-            <Dashboard />
-          </PrivateRoute>
-        } />
+          <Route path="/tickets" element={
+            <PrivateRoute>
+              <Dashboard />
+            </PrivateRoute>
+          } />
 
-        <Route path="/tickets/new" element={
-          <PrivateRoute roles={['customer']}>
-            <NewTicket />
-          </PrivateRoute>
-        } />
+          <Route path="/tickets/new" element={
+            <PrivateRoute roles={['customer']}>
+              <NewTicket />
+            </PrivateRoute>
+          } />
 
-        <Route path="/tickets/:id" element={
-          <PrivateRoute>
-            <TicketDetail />
-          </PrivateRoute>
-        } />
+          <Route path="/tickets/:id" element={
+            <PrivateRoute>
+              <TicketDetail />
+            </PrivateRoute>
+          } />
 
-        <Route path="/kb" element={
-          <PrivateRoute>
-            <KnowledgeBase />
-          </PrivateRoute>
-        } />
+          <Route path="/kb" element={
+            <PrivateRoute>
+              <KnowledgeBase />
+            </PrivateRoute>
+          } />
 
-        <Route path="/debug" element={
-          <PrivateRoute roles={['engineer', 'admin']}>
-            <APIDebugger />
-          </PrivateRoute>
-        } />
+          <Route path="/debug" element={
+            <PrivateRoute roles={['engineer', 'admin']}>
+              <APIDebugger />
+            </PrivateRoute>
+          } />
 
-        <Route path="/logs" element={
-          <PrivateRoute roles={['engineer', 'admin']}>
-            <LogAnalyzer />
-          </PrivateRoute>
-        } />
+          <Route path="/logs" element={
+            <PrivateRoute roles={['engineer', 'admin']}>
+              <LogAnalyzer />
+            </PrivateRoute>
+          } />
 
-        <Route path="/admin" element={
-          <PrivateRoute roles={['admin']}>
-            <AdminDashboard />
-          </PrivateRoute>
-        } />
+          <Route path="/admin" element={
+            <PrivateRoute roles={['admin']}>
+              <AdminDashboard />
+            </PrivateRoute>
+          } />
 
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Router>
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }

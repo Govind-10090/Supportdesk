@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { useNavigate, Link } from 'react-router-dom';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   ArrowLeft, 
   Send, 
@@ -12,6 +14,7 @@ import {
 
 export default function NewTicket() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -23,9 +26,17 @@ export default function NewTicket() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setLoading(true);
     try {
-      await api.post('/tickets', formData);
+      await addDoc(collection(db, 'tickets'), {
+        ...formData,
+        status: 'open',
+        customer_id: user.id,
+        customer_name: user.name,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
       navigate('/');
     } catch (err) {
       console.error(err);
@@ -153,8 +164,4 @@ export default function NewTicket() {
       </div>
     </div>
   );
-}
-
-function Link({ to, children, className }: any) {
-  return <a href={to} className={className}>{children}</a>;
 }

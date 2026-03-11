@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the user" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "role": { "type": "string", "enum": ["customer", "engineer", "admin"], "description": "User role" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Support ticket information",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Brief summary of the issue" },
+        "description": { "type": "string", "description": "Detailed description of the problem" },
+        "category": { "type": "string", "description": "Ticket category (e.g., Billing, Technical)" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"], "description": "Urgency level" },
+        "status": { "type": "string", "enum": ["open", "investigating", "pending", "resolved"], "description": "Current status" },
+        "product_module": { "type": "string", "description": "Specific product area" },
+        "customer_id": { "type": "string", "description": "UID of the customer who created the ticket" },
+        "customer_name": { "type": "string", "description": "Name of the customer" },
+        "assigned_to": { "type": "string", "description": "UID of the engineer assigned to the ticket" },
+        "engineer_name": { "type": "string", "description": "Name of the assigned engineer" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updated_at": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["title", "description", "category", "priority", "status", "customer_id"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a support ticket",
+      "type": "object",
+      "properties": {
+        "ticket_id": { "type": "string", "description": "ID of the parent ticket" },
+        "user_id": { "type": "string", "description": "UID of the commenter" },
+        "user_name": { "type": "string", "description": "Name of the commenter" },
+        "user_role": { "type": "string", "description": "Role of the commenter" },
+        "content": { "type": "string", "description": "Comment text" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["ticket_id", "user_id", "content"]
+    },
+    "KBArticle": {
+      "title": "Knowledge Base Article",
+      "description": "An article in the knowledge base",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Article title" },
+        "content": { "type": "string", "description": "Article content in markdown" },
+        "category": { "type": "string", "description": "Article category" },
+        "author_id": { "type": "string", "description": "UID of the author" },
+        "author_name": { "type": "string", "description": "Name of the author" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["title", "content", "category", "author_id"]
+    },
+    "Log": {
+      "title": "System Log",
+      "description": "Application error or info log",
+      "type": "object",
+      "properties": {
+        "severity": { "type": "string", "enum": ["info", "warning", "error", "critical"], "description": "Log level" },
+        "message": { "type": "string", "description": "Log message" },
+        "stack_trace": { "type": "string", "description": "Error stack trace if applicable" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Log timestamp" }
+      },
+      "required": ["severity", "message"]
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "User profiles" },
+    "tickets": { "schema": "Ticket", "description": "Support tickets" },
+    "tickets/{ticketId}/comments": { "schema": "Comment", "description": "Comments on a ticket" },
+    "knowledge_base": { "schema": "KBArticle", "description": "Knowledge base articles" },
+    "logs": { "schema": "Log", "description": "System logs" }
+  }
+}

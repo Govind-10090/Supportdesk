@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { db } from '../firebase';
 import { Log } from '../types';
 import { 
   Search, 
@@ -17,20 +18,15 @@ export default function LogAnalyzer() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [filter, setFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
-  const [expandedLog, setExpandedLog] = useState<number | null>(null);
+  const [expandedLog, setExpandedLog] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchLogs();
+    const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Log)));
+    });
+    return () => unsubscribe();
   }, []);
-
-  const fetchLogs = async () => {
-    try {
-      const { data } = await api.get('/logs');
-      setLogs(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = log.message.toLowerCase().includes(filter.toLowerCase()) || 
@@ -81,7 +77,6 @@ export default function LogAnalyzer() {
             <option value="info">Info</option>
           </select>
           <button 
-            onClick={fetchLogs}
             className="p-3 bg-[#141414] text-white rounded-lg hover:bg-[#141414]/90 transition-all"
           >
             Refresh

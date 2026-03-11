@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { doc, onSnapshot, updateDoc, collection, addDoc, query, orderBy, getDocs, where } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { Ticket, Comment, User } from '../types';
 import { 
   Send, 
@@ -18,34 +20,53 @@ import { formatDistanceToNow } from 'date-fns';
 export default function TicketDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, isAuthReady } = useAuth();
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [engineers, setEngineers] = useState<User[]>([]);
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
-    fetchTicket();
-    if (user.role !== 'customer') {
+    if (!isAuthReady || !id) return;
+
+    const unsubscribeTicket = onSnapshot(doc(db, 'tickets', id), (docSnap) => {
+      if (docSnap.exists()) {
+        setTicket({ id: docSnap.id, ...docSnap.data() } as Ticket);
+      } else {
+        setTicket(null);
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching ticket:", error);
+      setLoading(false);
+    });
+
+    const unsubscribeComments = onSnapshot(
+      query(collection(db, `tickets/${id}/comments`), orderBy('created_at', 'asc')),
+      (snapshot) => {
+        const commentData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Comment[];
+        setTicket(prev => prev ? { ...prev, comments: commentData } : null);
+      }
+    );
+
+    if (user && user.role !== 'customer') {
       fetchEngineers();
     }
-  }, [id]);
 
-  const fetchTicket = async () => {
-    try {
-      const { data } = await api.get(`/tickets/${id}`);
-      setTicket(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return () => {
+      unsubscribeTicket();
+      unsubscribeComments();
+    };
+  }, [id, isAuthReady, user]);
 
   const fetchEngineers = async () => {
     try {
-      const { data } = await api.get('/admin/db/users');
-      setEngineers(data.filter((u: User) => u.role === 'engineer' || u.role === 'admin'));
+      const q = query(collection(db, 'users'), where('role', 'in', ['engineer', 'admin']));
+      const snapshot = await getDocs(q);
+      setEngineers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
     } catch (err) {
       console.error(err);
     }
@@ -53,41 +74,58 @@ export default function TicketDetail() {
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !user || !id) return;
     try {
-      await api.post(`/tickets/${id}/comments`, { content: newComment });
+      await addDoc(collection(db, `tickets/${id}/comments`), {
+        ticket_id: id,
+        user_id: user.id,
+        user_name: user.name,
+        user_role: user.role,
+        content: newComment,
+        created_at: new Date().toISOString()
+      });
       setNewComment('');
-      fetchTicket();
     } catch (err) {
       console.error(err);
     }
   };
 
   const handleUpdateStatus = async (status: string) => {
+    if (!id) return;
     try {
-      await api.patch(`/tickets/${id}`, { status });
-      fetchTicket();
+      await updateDoc(doc(db, 'tickets', id), { 
+        status,
+        updated_at: new Date().toISOString()
+      });
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleAssign = async (engineerId: number) => {
+  const handleAssign = async (engineerId: string) => {
+    if (!id) return;
     try {
-      await api.patch(`/tickets/${id}`, { assigned_to: engineerId });
-      fetchTicket();
+      const engineer = engineers.find(e => e.id === engineerId);
+      await updateDoc(doc(db, 'tickets', id), { 
+        assigned_to: engineerId || null,
+        engineer_name: engineer?.name || null,
+        updated_at: new Date().toISOString()
+      });
     } catch (err) {
       console.error(err);
     }
   };
 
   const convertToKB = async () => {
-    if (!ticket) return;
+    if (!ticket || !user) return;
     try {
-      await api.post('/kb', {
+      await addDoc(collection(db, 'knowledge_base'), {
         title: `Solution: ${ticket.title}`,
         content: `Issue: ${ticket.description}\n\nResolution: [Add resolution steps here based on investigation notes]`,
-        category: ticket.category
+        category: ticket.category,
+        author_id: user.id,
+        author_name: user.name,
+        created_at: new Date().toISOString()
       });
       alert('Converted to Knowledge Base article!');
     } catch (err) {
@@ -227,7 +265,7 @@ export default function TicketDetail() {
                 ) : (
                   <select 
                     value={ticket.assigned_to || ''}
-                    onChange={(e) => handleAssign(Number(e.target.value))}
+                    onChange={(e) => handleAssign(e.target.value)}
                     className="w-full p-2 bg-[#F5F5F0] border-none rounded-lg text-sm font-medium focus:ring-2 focus:ring-[#141414] outline-none"
                   >
                     <option value="">Unassigned</option>

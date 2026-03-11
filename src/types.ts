@@ -1,7 +1,7 @@
 export type Role = 'customer' | 'engineer' | 'admin';
 
 export interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: Role;
@@ -9,15 +9,15 @@ export interface User {
 }
 
 export interface Ticket {
-  id: number;
+  id: string;
   title: string;
   description: string;
   category: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'open' | 'investigating' | 'pending' | 'resolved';
   product_module: string;
-  customer_id: number;
-  assigned_to: number | null;
+  customer_id: string;
+  assigned_to: string | null;
   created_at: string;
   updated_at: string;
   customer_name?: string;
@@ -26,9 +26,9 @@ export interface Ticket {
 }
 
 export interface Comment {
-  id: number;
-  ticket_id: number;
-  user_id: number;
+  id: string;
+  ticket_id: string;
+  user_id: string;
   content: string;
   created_at: string;
   user_name: string;
@@ -36,17 +36,17 @@ export interface Comment {
 }
 
 export interface KBArticle {
-  id: number;
+  id: string;
   title: string;
   content: string;
   category: string;
-  author_id: number;
+  author_id: string;
   created_at: string;
   author_name: string;
 }
 
 export interface Log {
-  id: number;
+  id: string;
   severity: string;
   message: string;
   stack_trace: string;

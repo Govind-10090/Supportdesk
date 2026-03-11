@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
 import { KBArticle } from '../types';
 import { 
   Search, 
@@ -18,17 +19,12 @@ export default function KnowledgeBase() {
   const [selectedArticle, setSelectedArticle] = useState<KBArticle | null>(null);
 
   useEffect(() => {
-    fetchArticles();
+    const q = query(collection(db, 'knowledge_base'), orderBy('created_at', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setArticles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KBArticle)));
+    });
+    return () => unsubscribe();
   }, []);
-
-  const fetchArticles = async () => {
-    try {
-      const { data } = await api.get('/kb');
-      setArticles(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const filteredArticles = articles.filter(article => 
     article.title.toLowerCase().includes(search.toLowerCase()) ||

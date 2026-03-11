@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import { collection, getDocs, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
 import { 
   Users, 
-  Ticket, 
+  Ticket as TicketIcon, 
   Database, 
   BarChart3, 
   Trash2, 
@@ -28,34 +29,53 @@ import {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
-  const [collection, setCollection] = useState('users');
+  const [activeCollection, setActiveCollection] = useState('users');
   const [dbData, setDbData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchStats();
-    fetchDbData();
-  }, [collection]);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, activeCollection), (snapshot) => {
+      setDbData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [activeCollection]);
 
   const fetchStats = async () => {
     try {
-      const { data } = await api.get('/admin/stats');
-      setStats(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+      const ticketsSnap = await getDocs(collection(db, 'tickets'));
+      const tickets = ticketsSnap.docs.map(doc => doc.data());
+      
+      const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'engineer')));
+      const engineers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  const fetchDbData = async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get(`/admin/db/${collection}`);
-      setDbData(data);
+      const categoryCountsMap: any = {};
+      const statusCountsMap: any = {};
+      
+      tickets.forEach((t: any) => {
+        categoryCountsMap[t.category] = (categoryCountsMap[t.category] || 0) + 1;
+        statusCountsMap[t.status] = (statusCountsMap[t.status] || 0) + 1;
+      });
+
+      const categoryCounts = Object.entries(categoryCountsMap).map(([category, count]) => ({ category, count }));
+      
+      const engineerWorkload = await Promise.all(engineers.map(async (eng: any) => {
+        const count = tickets.filter((t: any) => t.assigned_to === eng.id).length;
+        return { name: eng.name, ticket_count: count };
+      }));
+
+      setStats({
+        totalTickets: tickets.length,
+        categoryCounts,
+        engineerWorkload
+      });
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -149,13 +169,12 @@ export default function AdminDashboard() {
                 />
               </div>
               <select 
-                value={collection}
-                onChange={(e) => setCollection(e.target.value)}
+                value={activeCollection}
+                onChange={(e) => setActiveCollection(e.target.value)}
                 className="p-2 bg-[#141414] text-white border-none rounded-lg font-bold text-xs uppercase tracking-widest outline-none"
               >
                 <option value="users">Users</option>
                 <option value="tickets">Tickets</option>
-                <option value="comments">Comments</option>
                 <option value="knowledge_base">Knowledge Base</option>
                 <option value="logs">System Logs</option>
               </select>

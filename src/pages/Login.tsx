@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { LogIn, ShieldCheck } from 'lucide-react';
 
 export default function Login() {
@@ -8,7 +10,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('customer');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -17,16 +18,24 @@ export default function Login() {
     setError('');
     try {
       if (isLogin) {
-        const { data } = await api.post('/auth/login', { email, password });
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        await signInWithEmailAndPassword(auth, email, password);
         navigate('/');
       } else {
-        await api.post('/auth/register', { name, email, password, role });
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Create user document in Firestore
+        await setDoc(doc(db, 'users', user.uid), {
+          name,
+          email,
+          role: 'customer',
+          created_at: new Date().toISOString()
+        });
+        
         setIsLogin(true);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'An error occurred');
+      setError(err.message || 'An error occurred');
     }
   };
 
@@ -83,20 +92,6 @@ export default function Login() {
               placeholder="••••••••"
             />
           </div>
-          {!isLogin && (
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-widest mb-2">Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full p-3 border border-[#141414] focus:ring-2 focus:ring-[#141414] outline-none transition-all bg-white"
-              >
-                <option value="customer">Customer</option>
-                <option value="engineer">Support Engineer</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-          )}
 
           <button
             type="submit"

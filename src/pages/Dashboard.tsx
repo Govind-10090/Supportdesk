@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../services/api';
-import { Ticket, User } from '../types';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { Ticket } from '../types';
 import { 
   Plus, 
   Search, 
@@ -25,22 +27,31 @@ function cn(...inputs: ClassValue[]) {
 export default function Dashboard() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const { user, isAuthReady } = useAuth();
 
   useEffect(() => {
-    fetchTickets();
-  }, []);
+    if (!isAuthReady || !user) return;
 
-  const fetchTickets = async () => {
-    try {
-      const { data } = await api.get('/tickets');
-      setTickets(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+    let q = query(collection(db, 'tickets'), orderBy('updated_at', 'desc'));
+    
+    if (user.role === 'customer') {
+      q = query(collection(db, 'tickets'), where('customer_id', '==', user.id), orderBy('updated_at', 'desc'));
     }
-  };
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const ticketData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Ticket[];
+      setTickets(ticketData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching tickets:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, isAuthReady]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
